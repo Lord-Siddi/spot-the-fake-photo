@@ -536,15 +536,15 @@
                 </div>
                 
                 <div class="stat-card">
-                    <span class="stat-label">API Latency</span>
-                    <span class="stat-value" id="latency-text" style="color: var(--accent-cyan);">-- ms</span>
+                    <span class="stat-label">Liveness Method</span>
+                    <span class="stat-value" style="color: var(--accent-cyan); font-size: 0.95rem; font-weight: 600;">SVM (RBF)</span>
                 </div>
             </div>
         </div>
     </main>
 
     <footer>
-        <p>Spot the Fake Photo Classifier &copy; 2026. Powered by Random Forest & OpenCV.</p>
+        <p>Spot the Fake Photo Classifier &copy; 2026. Powered by SVM RBF & OpenCV.</p>
     </footer>
 
     <script>
@@ -560,7 +560,6 @@
         const scoreBar = document.getElementById('score-bar');
         const statusIndicator = document.getElementById('status-indicator');
         const statusText = document.getElementById('status-text');
-        const latencyText = document.getElementById('latency-text');
 
         // Trigger input select
         btnSelect.addEventListener('click', () => fileInput.click());
@@ -619,7 +618,6 @@
             statusIndicator.className = "status-dot status-running";
             statusText.innerText = "Analyzing...";
 
-            const startTime = performance.now();
             try {
                 const response = await fetch('/predict', {
                     method: 'POST',
@@ -635,10 +633,8 @@
 
                 const data = await response.json();
                 const score = data.score;
-                const endTime = performance.now();
-                const latency = (endTime - startTime).toFixed(0);
 
-                updateUI(score, latency);
+                updateUI(score);
             } catch (error) {
                 console.error("Prediction API error:", error);
                 statusIndicator.className = "status-dot";
@@ -648,10 +644,7 @@
             }
         }
 
-        function updateUI(score, latency) {
-            // Update latency card
-            latencyText.innerText = `${latency} ms`;
-
+        function updateUI(score) {
             // Reset status
             statusIndicator.className = "status-dot";
             statusIndicator.style.backgroundColor = "var(--accent-green)";
