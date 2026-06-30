@@ -483,17 +483,46 @@
                 return;
             }
 
-            // Display Image Preview
             const reader = new FileReader();
             reader.onload = (e) => {
-                previewImg.src = e.target.result;
-                placeholder.style.display = 'none';
-                previewImg.style.display = 'block';
+                const img = new Image();
+                img.onload = () => {
+                    // Display Image Preview
+                    previewImg.src = img.src;
+                    placeholder.style.display = 'none';
+                    previewImg.style.display = 'block';
+
+                    // Downsample to max 1024px on the client side
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    const maxDim = 1024;
+                    
+                    let w = img.width;
+                    let h = img.height;
+                    if (w > h) {
+                        if (w > maxDim) {
+                            h = Math.round(h * maxDim / w);
+                            w = maxDim;
+                        }
+                    } else {
+                        if (h > maxDim) {
+                            w = Math.round(w * maxDim / h);
+                            h = maxDim;
+                        }
+                    }
+
+                    canvas.width = w;
+                    canvas.height = h;
+                    ctx.drawImage(img, 0, 0, w, h);
+
+                    // Convert to high-quality JPEG blob (0.92 preserves high-frequency FFT details)
+                    canvas.toBlob((blob) => {
+                        runClassification(blob);
+                    }, 'image/jpeg', 0.92);
+                };
+                img.src = e.target.result;
             };
             reader.readAsDataURL(file);
-
-            // Upload and classify
-            runClassification(file);
         }
 
         async function runClassification(file) {
