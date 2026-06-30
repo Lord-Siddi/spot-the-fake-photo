@@ -224,24 +224,11 @@ def extract_bezel_features(gray_resized):
 def extract_features(image_path):
     """
     Extracts a 28-dimensional flat feature vector from an image.
-    Resizes images exceeding 1024px to match the client-side downsampling,
-    ensuring identical train and test image properties.
+    Uses full resolution loading with 512x512 crops to preserve subpixel details for peak accuracy.
     """
     img_bgr = cv2.imread(image_path)
     if img_bgr is None:
         raise ValueError(f"Failed to load image: {image_path}")
-        
-    # Apply 1024px max-dimension scaling to align training data with inference uploads
-    h, w = img_bgr.shape[:2]
-    max_dim = 1024
-    if max(h, w) > max_dim:
-        if w > h:
-            new_w = max_dim
-            new_h = int(round(h * max_dim / w))
-        else:
-            new_h = max_dim
-            new_w = int(round(w * max_dim / h))
-        img_bgr = cv2.resize(img_bgr, (new_w, new_h), interpolation=cv2.INTER_LINEAR)
         
     img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
     img_gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
