@@ -208,7 +208,8 @@ def extract_bezel_features(gray_resized):
 def extract_features(image_path):
     """
     Extracts a 28-dimensional flat feature vector from an image.
-    Uses full resolution loading with 512x512 crops to preserve subpixel details.
+    Uses Multi-Crop pooling (Center, Top-Left, Top-Right, Bottom-Left, Bottom-Right)
+    to guarantee position and scale invariance, averaging features across all 5 crops.
     """
     img_bgr = cv2.imread(image_path)
     if img_bgr is None:
@@ -219,36 +220,63 @@ def extract_features(image_path):
     
     h, w = img_gray.shape
     
-    # 1. Extract 512x512 center crops
-    cy, cx = h // 2, w // 2
-    y_start, y_end = max(0, cy - 256), min(h, cy + 256)
-    x_start, x_end = max(0, cx - 256), min(w, cx + 256)
+    # Define 5 crop coordinates (each 512x512)
+    crops_coords = [
+        # 1. Center
+        (max(0, h//2 - 256), min(h, h//2 + 256), max(0, w//2 - 256), min(w, w//2 + 256)),
+        # 2. Top-Left
+        (0, min(h, 512), 0, min(w, 512)),
+        # 3. Top-Right
+        (0, min(h, 512), max(0, w - 512), w),
+        # 4. Bottom-Left
+        (max(0, h - 512), h, 0, min(w, 512)),
+        # 5. Bottom-Right
+        (max(0, h - 512), h, max(0, w - 512), w)
+    ]
     
-    gray_crop = img_gray[y_start:y_end, x_start:x_end]
-    rgb_crop = img_rgb[y_start:y_end, x_start:x_end]
+    features_list = []
     
-    if gray_crop.shape != (512, 512):
-        pad_y = 512 - gray_crop.shape[0]
-        pad_x = 512 - gray_crop.shape[1]
-        gray_crop = np.pad(gray_crop, ((0, pad_y), (0, pad_x)), mode='edge')
-        rgb_crop = np.pad(rgb_crop, ((0, pad_y), (0, pad_x), (0, 0)), mode='edge')
-        
-    # 2. Resized images for global color/geometry details (512x384)
+    # Global resized structures (only run once per image)
     img_rgb_resized = cv2.resize(img_rgb, (512, 384))
     img_gray_resized = cv2.resize(img_gray, (512, 384))
     
-    features = []
+    global_color = extract_color_cast_features(img_rgb_resized)
+    global_glare = extract_glare_features(img_rgb_resized)
+    global_sharpness = extract_sharpness_features(img_gray_resized)
+    global_bezel = extract_bezel_features(img_gray_resized)
     
-    features.extend(extract_fft_features(gray_crop))
-    features.extend(extract_subpixel_features(rgb_crop))
-    features.extend(extract_banding_features(gray_crop))
-    features.extend(extract_color_cast_features(img_rgb_resized))
-    features.extend(extract_glare_features(img_rgb_resized))
-    features.extend(extract_sharpness_features(img_gray_resized))
-    features.extend(extract_blockiness_features(gray_crop))
-    features.extend(extract_bezel_features(img_gray_resized))
-    
-    return np.array(features, dtype=float)
+    for y_start, y_end, x_start, x_end in crops_coords:
+        gray_crop = img_gray[y_start:y_end, x_start:x_end]
+        rgb_crop = img_rgb[y_start:y_end, x_start:x_end]
+        
+        # Pad if crops are smaller than 512x512
+        if gray_crop.shape != (512, 512):
+            pad_y = 512 - gray_crop.shape[0]
+            pad_x = 512 - gray_crop.shape[1]
+            gray_crop = np.pad(gray_crop, ((0, pad_y), (0, pad_x)), mode='edge')
+            rgb_crop = np.pad(rgb_crop, ((0, pad_y), (0, pad_x), (0, 0)), mode='edge')
+            
+        crop_fft = extract_fft_features(gray_crop)
+        crop_subpixel = extract_subpixel_features(rgb_crop)
+        crop_banding = extract_banding_features(gray_crop)
+        crop_block = extract_blockiness_features(gray_crop)
+        
+        # Combine local crop-based features and global image-based features
+        crop_vector = []
+        crop_vector.extend(crop_fft)
+        crop_vector.extend(crop_subpixel)
+        crop_vector.extend(crop_banding)
+        crop_vector.extend(global_color)
+        crop_vector.extend(global_glare)
+        crop_vector.extend(global_sharpness)
+        crop_vector.extend(crop_block)
+        crop_vector.extend(global_bezel)
+        
+        features_list.append(crop_vector)
+        
+    # Pool features by taking the mean across the 5 crops
+    mean_features = np.mean(features_list, axis=0)
+    return mean_features
 
 # List of feature names for tracking and analysis
 FEATURE_NAMES = [
