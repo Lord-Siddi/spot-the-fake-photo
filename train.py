@@ -116,17 +116,11 @@ def main():
                 'n_estimators': [50, 100]
             }
         ),
-        "SVM (Linear)": (
-            SVC(kernel='linear', probability=True, class_weight='balanced', random_state=42),
-            {
-                'C': [0.01, 0.1, 1.0, 10.0, 100.0]
-            }
-        ),
         "SVM (RBF)": (
             SVC(kernel='rbf', probability=True, class_weight='balanced', random_state=42),
             {
                 'C': [0.1, 1.0, 10.0, 100.0],
-                'gamma': ['scale', 'auto', 0.01, 0.1]
+                'gamma': [0.001, 0.01, 0.1, 'scale', 'auto']
             }
         )
     }
@@ -152,15 +146,7 @@ def main():
         print(f"  Best params: {best_params}")
         print(f"  Best CV Accuracy: {mean_cv:.4f}")
         
-        # RBF kernels show much higher generalization capacity on unseen domains
-        # than linear models, so we prioritize SVM (RBF) if its CV score is highly competitive
-        # (within 0.015 of the best score).
-        is_better = (mean_cv > best_cv_mean)
-        if name == "SVM (RBF)" and best_clf_name is not None and "SVM (RBF)" not in best_clf_name:
-            if mean_cv >= best_cv_mean - 0.015:
-                is_better = True
-                
-        if is_better:
+        if mean_cv > best_cv_mean:
             best_cv_mean = mean_cv
             best_clf = grid_search.best_estimator_
             best_clf_name = f"{name} ({best_params})"
