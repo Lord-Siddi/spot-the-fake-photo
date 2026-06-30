@@ -1,5 +1,7 @@
 # Spot the Fake Photo - Binary Classifier
 
+**Live Deployed Application**: [https://spot-the-fake-photo.onrender.com/](https://spot-the-fake-photo.onrender.com/)
+
 This repository contains a lightweight, high-performance binary classifier designed to distinguish between **genuine first-generation photos** and **screen recaptures / photo-of-a-screen photos**.
 
 The solution uses **28 handcrafted computer vision features** (frequency moiré peaks, subpixel layouts, color cast, JPEG blockiness, specular glare, sharpness distributions, and screen bezels) fed into a lightweight **Support Vector Machine (SVM RBF) Classifier** instead of a heavy deep learning CNN.
