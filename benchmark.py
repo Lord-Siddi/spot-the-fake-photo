@@ -19,13 +19,12 @@ def main():
     real_paths = sorted(list(set(real_paths)))[:10]
     
     screen_paths = []
-    # Search data/screen
-    for ext in extensions:
-        screen_paths.extend(glob.glob(os.path.join("data", "screen", ext)))
-    # Also search data/screen-mobile if it exists
-    if os.path.exists(os.path.join("data", "screen-mobile")):
-        for ext in extensions:
-            screen_paths.extend(glob.glob(os.path.join("data", "screen-mobile", ext)))
+    # Search all candidate screen directories
+    for d in ["screen", "screen-laptop", "screen-mobile", "screen-print"]:
+        dir_path = os.path.join("data", d)
+        if os.path.exists(dir_path):
+            for ext in extensions:
+                screen_paths.extend(glob.glob(os.path.join(dir_path, ext)))
     screen_paths = sorted(list(set(screen_paths)))[:10]
     
     test_paths = real_paths + screen_paths

@@ -61,10 +61,12 @@ def load_dataset(real_dir, screen_dirs):
 
 def main():
     real_dir = r"data\real"
-    screen_dirs = [r"data\screen"]
-    if os.path.exists(r"data\screen-mobile"):
-        screen_dirs.append(r"data\screen-mobile")
-    
+    screen_dirs = []
+    for d in ["screen", "screen-laptop", "screen-mobile", "screen-print"]:
+        path = os.path.join("data", d)
+        if os.path.exists(path):
+            screen_dirs.append(path)
+            
     X, y = load_dataset(real_dir, screen_dirs)
     
     if len(X) < 10:
