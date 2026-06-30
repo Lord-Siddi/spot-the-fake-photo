@@ -224,7 +224,7 @@ def extract_bezel_features(gray_resized):
 def extract_features(image_path):
     """
     Extracts a 28-dimensional flat feature vector from an image.
-    Handles loading, cropping, resizing, and calls each sub-feature extractor.
+    Uses full resolution loading with 512x512 crops to preserve subpixel details for peak accuracy.
     """
     img_bgr = cv2.imread(image_path)
     if img_bgr is None:
@@ -235,7 +235,7 @@ def extract_features(image_path):
     
     h, w = img_gray.shape
     
-    # 1. Extract 512x512 center crops to preserve raw pixel/frequency information
+    # 1. Extract 512x512 center crops (essential to preserve subpixel/moiré detail)
     cy, cx = h // 2, w // 2
     y_start, y_end = max(0, cy - 256), min(h, cy + 256)
     x_start, x_end = max(0, cx - 256), min(w, cx + 256)
@@ -250,7 +250,7 @@ def extract_features(image_path):
         gray_crop = np.pad(gray_crop, ((0, pad_y), (0, pad_x)), mode='edge')
         rgb_crop = np.pad(rgb_crop, ((0, pad_y), (0, pad_x), (0, 0)), mode='edge')
         
-    # 2. Resized images for global color/geometry details
+    # 2. Resized images for global color/geometry details (512x384)
     img_rgb_resized = cv2.resize(img_rgb, (512, 384))
     img_gray_resized = cv2.resize(img_gray, (512, 384))
     
