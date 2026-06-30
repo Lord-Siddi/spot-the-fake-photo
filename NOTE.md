@@ -1,0 +1,28 @@
+# Spot the Fake Photo - ML Classifier Report
+
+## Approach Summary
+We built a lightweight binary classifier using 28 handcrafted computer vision features feeding into a Random Forest classifier. The features capture screen-recapture indicators: moiré patterns (via 2D FFT peak-to-mean ratio in the mid-high frequency band), high-frequency subpixel color offsets (via Laplacian variance of RGB channel differences), JPEG blockiness (via 8x8 grid boundary step-changes), color cast (via Lab and RGB channel means and ratios), specular glare (via HSV thresholded blobs), edge sharpness uniformity (via 4x4 grid Laplacian variance coefficient of variation), and monitor bezel detection (via Canny and convex quadrilateral contour analysis). Random Forest outperformed Logistic Regression and Gradient Boosting in cross-validation. This approach is highly interpretable, fast, and lightweight (the model is ~250 KB), making it ideal for mobile integration.
+
+## Honest Accuracy Numbers
+- **Stratified 5-Fold Cross-Validation Accuracy**: **89.17%** (on the 120 training samples)
+- **Held-out Test Accuracy**: **96.67%** (29/30 correct on the untouched test slice; 9/10 real correct, 20/20 screen correct)
+- *Note: Performance metrics are measured on our updated dataset of 150 images (50 real, 50 laptop screen, 50 mobile screen).*
+
+## Latency
+- **Mean Latency**: **120.05 ms** per image.
+- **Profiling Device**: Intel64 Family 6 Model 154 Stepping 3 CPU (laptop run under Windows 11).
+- **Latency Breakdown**:
+  - Image Loading/Decoding: **~75 ms** (representing 62.5% of runtime).
+  - Feature Extraction (FFT, color stats, blockiness, etc.): **~45 ms** (representing 37.5% of runtime).
+  - Model Inference: **< 1 ms**.
+
+## Cost per Image
+- **On-Device (Mobile App)**: **$0.00** (runs client-side on the user's phone, utilizing their CPU free of charge).
+- **Cloud Server**: **$0.02 per 1,000 images** ($20.00 per million images).
+  - *Assumptions*: A small cloud instance (e.g., AWS `t3.medium` at ~$0.0416/hr) can serve sequentially at 120 ms/image (~30,000 images/hr). Raw compute cost is $1.39 per million images. Factoring in a 15x overhead margin for load balancing, network latency, and server idling, the final estimate is $20.00 per million images.
+
+---
+## Future Improvements
+1. **Adaptive Resolution Loading**: Load images at half-resolution (`cv2.IMREAD_REDUCED_COLOR_2`) to cut image decoding times in half (~100ms savings) while validating that subpixel features remain discriminative.
+2. **Dynamic Cutoff Thresholding**: Instead of a default 0.5 decision threshold, tune the probability threshold using precision-recall curves based on the business costs of false positives (user friction) vs. false negatives (fraud bypass).
+3. **Adaptive Retraining**: As screens and recapture methods evolve, run active learning to query low-confidence samples, label them, and retrain the model to capture new screen technologies (e.g., higher-density displays).

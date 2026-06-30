@@ -1,0 +1,20 @@
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environment
+venv/
+ENV/
+env/
+.env
+.venv
+
+# IDEs
+.vscode/
+.idea/
+
+# Demo temp files
+demo/temp_frame.jpg
+demo/temp_demo_frame.jpg
