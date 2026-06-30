@@ -61,7 +61,9 @@ def load_dataset(real_dir, screen_dirs):
 
 def main():
     real_dir = r"data\real"
-    screen_dirs = [r"data\screen", r"data\screen-mobile"]
+    screen_dirs = [r"data\screen"]
+    if os.path.exists(r"data\screen-mobile"):
+        screen_dirs.append(r"data\screen-mobile")
     
     X, y = load_dataset(real_dir, screen_dirs)
     

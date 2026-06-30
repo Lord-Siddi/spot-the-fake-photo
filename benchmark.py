@@ -10,12 +10,25 @@ import cv2
 from features import extract_features
 
 def main():
-    # Gather sample images (10 real, 5 laptop screen, 5 mobile screen)
-    real_paths = glob.glob(os.path.join("data", "real", "*.jpeg"))[:10]
-    laptop_paths = glob.glob(os.path.join("data", "screen", "*.jpeg"))[:5]
-    mobile_paths = glob.glob(os.path.join("data", "screen-mobile", "*.jpeg"))[:5]
+    # Gather sample images (10 real, 10 screen/recaptures)
+    extensions = ('*.jpg', '*.jpeg', '*.png', '*.JPG', '*.JPEG', '*.PNG')
     
-    test_paths = real_paths + laptop_paths + mobile_paths
+    real_paths = []
+    for ext in extensions:
+        real_paths.extend(glob.glob(os.path.join("data", "real", ext)))
+    real_paths = sorted(list(set(real_paths)))[:10]
+    
+    screen_paths = []
+    # Search data/screen
+    for ext in extensions:
+        screen_paths.extend(glob.glob(os.path.join("data", "screen", ext)))
+    # Also search data/screen-mobile if it exists
+    if os.path.exists(os.path.join("data", "screen-mobile")):
+        for ext in extensions:
+            screen_paths.extend(glob.glob(os.path.join("data", "screen-mobile", ext)))
+    screen_paths = sorted(list(set(screen_paths)))[:10]
+    
+    test_paths = real_paths + screen_paths
     if len(test_paths) == 0:
         print("Error: No test images found.")
         return
