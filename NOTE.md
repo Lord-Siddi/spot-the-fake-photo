@@ -9,17 +9,17 @@ We built a lightweight binary classifier using 28 handcrafted computer vision fe
 - *Note: Performance metrics are measured on our updated, perfectly balanced dataset of 150 images partitioned into 75 real, 25 laptop screen, 25 mobile screen, and 25 printed paper recaptures.*
 
 ## Latency
-- **Mean Latency**: **161.73 ms** per image.
+- **Mean Latency**: **220.52 ms** per image.
 - **Profiling Device**: Intel64 Family 6 Model 154 Stepping 3 CPU (laptop run under Windows 11).
 - **Latency Breakdown**:
-  - Image Loading/Decoding: **~105 ms** (representing 64.9% of runtime).
-  - Feature Extraction (FFT, color stats, blockiness, etc.): **~56 ms** (representing 34.6% of runtime).
+  - Image Loading/Decoding: **~165 ms** (representing 74.8% of runtime due to raw resolution loading).
+  - Feature Extraction (FFT, color stats, blockiness, etc.): **~55 ms** (representing 24.9% of runtime).
   - Model Inference: **< 1 ms**.
 
 ## Cost per Image
 - **On-Device (Mobile App)**: **$0.00** (runs client-side on the user's phone, utilizing their CPU free of charge).
-- **Cloud Server**: **$0.03 per 1,000 images** ($30.00 per million images).
-  - *Assumptions*: A small cloud instance (e.g., AWS `t3.medium` at ~$0.0416/hr) can serve sequentially at 161.73 ms/image (~22,250 images/hr). Raw compute cost is $1.87 per million images. Factoring in a 15x overhead margin for load balancing, network latency, and server idling, the final estimate is $30.00 per million images.
+- **Cloud Server**: **$0.05 per 1,000 images** ($50.00 per million images).
+  - *Assumptions*: A small cloud instance (e.g., AWS `t3.medium` at ~$0.0416/hr) can serve sequentially at 220.52 ms/image (~16,320 images/hr). Raw compute cost is $2.55 per million images. Factoring in a 15x overhead margin for load balancing, network latency, and server idling, the final estimate is $50.00 per million images.
 
 ---
 ## Future Improvements
