@@ -208,8 +208,7 @@ def extract_bezel_features(gray_resized):
 def extract_features(image_path):
     """
     Extracts a 28-dimensional flat feature vector from an image.
-    Uses multi-crop pooling (Center, Top-Left, Top-Right, Bottom-Left, Bottom-Right)
-    to aggregate local liveness features while preserving scale consistency.
+    Uses full resolution loading with a 512x512 center crop to preserve subpixel details.
     """
     img_bgr = cv2.imread(image_path)
     if img_bgr is None:
@@ -220,60 +219,34 @@ def extract_features(image_path):
     
     h, w = img_gray.shape
     
-    # Pad image if it's smaller than 512x512 in either dimension
-    if h < 512 or w < 512:
-        pad_y = max(0, 512 - h)
-        pad_x = max(0, 512 - w)
-        img_rgb = np.pad(img_rgb, ((0, pad_y), (0, pad_x), (0, 0)), mode='edge')
-        img_gray = np.pad(img_gray, ((0, pad_y), (0, pad_x)), mode='edge')
-        h, w = img_gray.shape
-        
-    # Extract the coordinates of the 5 spatial crops
+    # 1. Extract 512x512 center crops
     cy, cx = h // 2, w // 2
-    crop_coords = [
-        (cy - 256, cy + 256, cx - 256, cx + 256),   # Center
-        (0, 512, 0, 512),                           # Top-Left
-        (0, 512, w - 512, w),                       # Top-Right
-        (h - 512, h, 0, 512),                       # Bottom-Left
-        (h - 512, h, w - 512, w)                    # Bottom-Right
-    ]
+    y_start, y_end = max(0, cy - 256), min(h, cy + 256)
+    x_start, x_end = max(0, cx - 256), min(w, cx + 256)
     
-    # Extract crop-level features for each spatial crop
-    crop_features_list = []
-    for y_start, y_end, x_start, x_end in crop_coords:
-        gray_c = img_gray[y_start:y_end, x_start:x_end]
-        rgb_c = img_rgb[y_start:y_end, x_start:x_end]
-        
-        c_feats = []
-        c_feats.extend(extract_fft_features(gray_c))         # 2
-        c_feats.extend(extract_subpixel_features(rgb_c))     # 2
-        c_feats.extend(extract_banding_features(gray_c))      # 2
-        c_feats.extend(extract_blockiness_features(gray_c))   # 2
-        crop_features_list.append(c_feats)
-        
-    # Pool crop features by taking the mean across the 5 spatial locations
-    crop_features_pooled = np.mean(crop_features_list, axis=0)
+    gray_crop = img_gray[y_start:y_end, x_start:x_end]
+    rgb_crop = img_rgb[y_start:y_end, x_start:x_end]
     
-    # Resized images for global color/geometry details (512x384)
+    if gray_crop.shape != (512, 512):
+        pad_y = 512 - gray_crop.shape[0]
+        pad_x = 512 - gray_crop.shape[1]
+        gray_crop = np.pad(gray_crop, ((0, pad_y), (0, pad_x)), mode='edge')
+        rgb_crop = np.pad(rgb_crop, ((0, pad_y), (0, pad_x), (0, 0)), mode='edge')
+        
+    # 2. Resized images for global color/geometry details (512x384)
     img_rgb_resized = cv2.resize(img_rgb, (512, 384))
     img_gray_resized = cv2.resize(img_gray, (512, 384))
     
-    # Extract global features (calculated once per image)
-    color_cast = extract_color_cast_features(img_rgb_resized)   # 13
-    glare = extract_glare_features(img_rgb_resized)             # 3
-    sharpness = extract_sharpness_features(img_gray_resized)    # 2
-    bezel = extract_bezel_features(img_gray_resized)            # 2
-    
-    # Reassemble features in the exact original order of FEATURE_NAMES
     features = []
-    features.extend(crop_features_pooled[0:2])     # fft_high_low_ratio, fft_moire_peak_to_mean
-    features.extend(crop_features_pooled[2:4])     # subpixel_var_rg, subpixel_var_gb
-    features.extend(crop_features_pooled[4:6])     # banding_flat_ratio, banding_grad_std
-    features.extend(color_cast)                     # 13 color cast features
-    features.extend(glare)                          # 3 glare features
-    features.extend(sharpness)                      # 2 sharpness features
-    features.extend(crop_features_pooled[6:8])     # block_h, block_v
-    features.extend(bezel)                          # 2 bezel features
+    
+    features.extend(extract_fft_features(gray_crop))
+    features.extend(extract_subpixel_features(rgb_crop))
+    features.extend(extract_banding_features(gray_crop))
+    features.extend(extract_color_cast_features(img_rgb_resized))
+    features.extend(extract_glare_features(img_rgb_resized))
+    features.extend(extract_sharpness_features(img_gray_resized))
+    features.extend(extract_blockiness_features(gray_crop))
+    features.extend(extract_bezel_features(img_gray_resized))
     
     return np.array(features, dtype=float)
 
