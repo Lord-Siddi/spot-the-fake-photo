@@ -115,6 +115,19 @@ def main():
                 'max_depth': [3, 4, 5],
                 'n_estimators': [50, 100]
             }
+        ),
+        "SVM (Linear)": (
+            SVC(kernel='linear', probability=True, class_weight='balanced', random_state=42),
+            {
+                'C': [0.01, 0.1, 1.0, 10.0, 100.0]
+            }
+        ),
+        "SVM (RBF)": (
+            SVC(kernel='rbf', probability=True, class_weight='balanced', random_state=42),
+            {
+                'C': [0.1, 1.0, 10.0, 100.0],
+                'gamma': ['scale', 'auto', 0.01, 0.1]
+            }
         )
     }
     
