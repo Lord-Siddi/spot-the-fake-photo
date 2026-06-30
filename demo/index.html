@@ -496,6 +496,14 @@
                     </svg>
                     Use Camera
                 </button>
+                <input type="file" id="camera-input" accept="image/*" capture="environment" style="display: none;">
+            </div>
+            
+            <div style="margin-top: 1.2rem; padding: 0.8rem; border-radius: 8px; background: rgba(59, 130, 246, 0.05); border: 1px dashed rgba(59, 130, 246, 0.2); display: flex; gap: 0.6rem; align-items: flex-start; font-size: 0.82rem; line-height: 1.35; color: var(--text-secondary);">
+                <svg fill="none" stroke="#3b82f6" viewBox="0 0 24 24" style="width: 20px; height: 20px; flex-shrink: 0; margin-top: 1px;">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                <span><strong>Liveness Tip</strong>: To reliably detect high-density mobile screens, hold the camera closer (approx. 10–15 cm) when capturing so that subpixel pattern details are resolved.</span>
             </div>
         </div>
 
@@ -677,92 +685,25 @@
             }
         }
 
-        // Camera capture logic
-        const cameraModal = document.getElementById('camera-modal');
+        // Hidden camera input capture logic
         const btnCamera = document.getElementById('btn-camera');
-        const btnCloseCamera = document.getElementById('btn-close-camera');
-        const videoStream = document.getElementById('video-stream');
-        const btnCapture = document.getElementById('btn-capture');
-        let activeStream = null;
+        const cameraInput = document.getElementById('camera-input');
 
-        btnCamera.addEventListener('click', async () => {
-            try {
-                // Try back camera by default for environmental shots
-                activeStream = await navigator.mediaDevices.getUserMedia({
-                    video: { 
-                        facingMode: { ideal: 'environment' }, 
-                        width: { ideal: 1280 }, 
-                        height: { ideal: 960 } 
-                    }
-                });
-                videoStream.srcObject = activeStream;
-                cameraModal.style.display = 'flex';
-            } catch (err) {
-                console.error("Camera access error, fallback to any camera:", err);
-                try {
-                    activeStream = await navigator.mediaDevices.getUserMedia({ video: true });
-                    videoStream.srcObject = activeStream;
-                    cameraModal.style.display = 'flex';
-                } catch (fallbackErr) {
-                    console.error("All camera access failed:", fallbackErr);
-                    alert("Could not access camera. Please make sure camera permissions are allowed.");
-                }
-            }
+        btnCamera.addEventListener('click', () => {
+            cameraInput.click();
         });
 
-        function stopCamera() {
-            if (activeStream) {
-                activeStream.getTracks().forEach(track => track.stop());
-                activeStream = null;
-            }
-            cameraModal.style.display = 'none';
-        }
+        cameraInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
 
-        btnCloseCamera.addEventListener('click', stopCamera);
-        cameraModal.addEventListener('click', (e) => {
-            if (e.target === cameraModal) stopCamera();
-        });
+            const url = URL.createObjectURL(file);
+            previewImg.src = url;
+            placeholder.style.display = 'none';
+            previewImg.style.display = 'block';
 
-        btnCapture.addEventListener('click', () => {
-            if (!activeStream) return;
-            
-            const canvas = document.createElement('canvas');
-            // Try to use video natural resolution, fallback to video layout dimensions
-            canvas.width = videoStream.videoWidth || 640;
-            canvas.height = videoStream.videoHeight || 480;
-            const ctx = canvas.getContext('2d');
-            
-            // Draw frame to canvas
-            ctx.drawImage(videoStream, 0, 0, canvas.width, canvas.height);
-            
-            canvas.toBlob((blob) => {
-                // Preview captured frame
-                const url = URL.createObjectURL(blob);
-                previewImg.src = url;
-                placeholder.style.display = 'none';
-                previewImg.style.display = 'block';
-                
-                // Classify captured frame
-                runClassification(blob);
-                stopCamera();
-            }, 'image/jpeg', 0.95);
+            runClassification(file);
         });
     </script>
-
-    <!-- Camera Viewfinder Modal -->
-    <div class="modal-overlay" id="camera-modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Camera Viewfinder</h3>
-                <button class="close-btn" id="btn-close-camera">&times;</button>
-            </div>
-            <div class="camera-stream-wrapper">
-                <video id="video-stream" autoplay playsinline></video>
-            </div>
-            <div class="modal-actions">
-                <button class="btn btn-primary" id="btn-capture" style="width: 100%;">Capture Photo</button>
-            </div>
-        </div>
-    </div>
 </body>
 </html>

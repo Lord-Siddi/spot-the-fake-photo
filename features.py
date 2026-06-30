@@ -46,7 +46,9 @@ def extract_fft_features(gray_crop):
 def extract_subpixel_features(rgb_crop):
     """
     Detects high-frequency variations in R-G and G-B differences caused by
-    physical RGB pixel layouts on screens.
+    physical subpixel layouts on screens.
+    Also extracts layout-independent normalized variances and Pearson correlation coefficients 
+    to support diverse screen matrices (like PenTile OLED layouts).
     """
     r = rgb_crop[:, :, 0].astype(float)
     g = rgb_crop[:, :, 1].astype(float)
@@ -55,13 +57,45 @@ def extract_subpixel_features(rgb_crop):
     diff_rg = r - g
     diff_gb = g - b
     
+    lap_r = cv2.Laplacian(r, cv2.CV_64F)
+    lap_g = cv2.Laplacian(g, cv2.CV_64F)
+    lap_b = cv2.Laplacian(b, cv2.CV_64F)
+    
     lap_rg = cv2.Laplacian(diff_rg, cv2.CV_64F)
     lap_gb = cv2.Laplacian(diff_gb, cv2.CV_64F)
+    
+    var_r = np.var(lap_r)
+    var_g = np.var(lap_g)
+    var_b = np.var(lap_b)
     
     var_rg = np.var(lap_rg)
     var_gb = np.var(lap_gb)
     
-    return [var_rg, var_gb]
+    # Normalized scale-invariant features
+    norm_var_rg = var_rg / (var_r + var_g + 1e-6)
+    norm_var_gb = var_gb / (var_g + var_b + 1e-6)
+    
+    # Pearson correlation coefficients
+    std_r = np.std(lap_r)
+    std_g = np.std(lap_g)
+    std_b = np.std(lap_b)
+    
+    if std_r > 1e-5 and std_g > 1e-5:
+        corr_rg = np.mean((lap_r - np.mean(lap_r)) * (lap_g - np.mean(lap_g))) / (std_r * std_g)
+    else:
+        corr_rg = 1.0
+        
+    if std_g > 1e-5 and std_b > 1e-5:
+        corr_gb = np.mean((lap_g - np.mean(lap_g)) * (lap_b - np.mean(lap_b))) / (std_g * std_b)
+    else:
+        corr_gb = 1.0
+        
+    if std_r > 1e-5 and std_b > 1e-5:
+        corr_rb = np.mean((lap_r - np.mean(lap_r)) * (lap_b - np.mean(lap_b))) / (std_r * std_b)
+    else:
+        corr_rb = 1.0
+        
+    return [var_rg, var_gb, norm_var_rg, norm_var_gb, corr_rg, corr_gb, corr_rb]
 
 def extract_banding_features(gray_crop):
     """
@@ -242,8 +276,8 @@ def extract_bezel_features(gray_resized):
 
 def extract_features(image_path):
     """
-    Extracts a 33-dimensional flat feature vector from an image.
-    Uses full resolution loading with 512x512 crops to preserve subpixel details for peak accuracy.
+    Extracts a 38-dimensional flat feature vector from an image.
+    Preserves raw high resolution for files to keep subpixels intact.
     """
     img_bgr = cv2.imread(image_path)
     if img_bgr is None:
@@ -254,7 +288,7 @@ def extract_features(image_path):
     
     h, w = img_gray.shape
     
-    # 1. Extract 512x512 center crops (essential to preserve subpixel/moiré detail)
+    # 1. Extract 512x512 center crops
     cy, cx = h // 2, w // 2
     y_start, y_end = max(0, cy - 256), min(h, cy + 256)
     x_start, x_end = max(0, cx - 256), min(w, cx + 256)
@@ -277,12 +311,12 @@ def extract_features(image_path):
     features = []
     
     features.extend(extract_fft_features(gray_crop))
-    features.extend(extract_subpixel_features(rgb_crop))
+    features.extend(extract_subpixel_features(rgb_crop))            # 7 features
     features.extend(extract_banding_features(gray_crop))
     features.extend(extract_color_cast_features(img_rgb_resized))
     features.extend(extract_hsv_color_features(img_rgb_resized))   # 4 features
     features.extend(extract_glare_features(img_rgb_resized))
-    features.extend(extract_sharpness_features(gray_crop))          # 3 features (calculated on raw crop)
+    features.extend(extract_sharpness_features(gray_crop))          # 3 features
     features.extend(extract_blockiness_features(gray_crop))
     features.extend(extract_bezel_features(img_gray_resized))
     
@@ -292,6 +326,8 @@ def extract_features(image_path):
 FEATURE_NAMES = [
     "fft_high_low_ratio", "fft_moire_peak_to_mean",
     "subpixel_var_rg", "subpixel_var_gb",
+    "subpixel_norm_var_rg", "subpixel_norm_var_gb",
+    "subpixel_corr_rg", "subpixel_corr_gb", "subpixel_corr_rb",
     "banding_flat_ratio", "banding_grad_std",
     "color_mean_r", "color_mean_g", "color_mean_b",
     "color_std_r", "color_std_g", "color_std_b",

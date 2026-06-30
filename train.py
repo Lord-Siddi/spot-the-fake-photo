@@ -92,13 +92,12 @@ def main():
     # Step 3: Stratified 5-Fold Cross-Validation on the training set
     skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
     
-    # Grid search classifiers to find the best generalized fit
+    # Grid search classifiers to find the best generalized fit (excluding non-linear RBF to prevent overfitting)
     classifiers = {
         "Logistic Regression (L2)": LogisticRegression(C=1.0, max_iter=1000, class_weight='balanced', random_state=42),
         "Logistic Regression (C=10.0)": LogisticRegression(C=10.0, max_iter=1000, class_weight='balanced', random_state=42),
         "Random Forest (depth=10)": RandomForestClassifier(n_estimators=200, max_depth=10, class_weight='balanced', random_state=42),
-        "SVM (Linear)": SVC(kernel='linear', C=1.0, probability=True, class_weight='balanced', random_state=42),
-        "SVM (RBF)": SVC(kernel='rbf', C=10.0, probability=True, class_weight='balanced', random_state=42)
+        "SVM (Linear)": SVC(kernel='linear', C=1.0, probability=True, class_weight='balanced', random_state=42)
     }
     
     best_cv_mean = 0.0
