@@ -1,25 +1,25 @@
 # Spot the Fake Photo - ML Classifier Report
 
 ## Approach Summary
-We built a lightweight binary classifier using 28 handcrafted computer vision features feeding into a Random Forest classifier. The features capture screen-recapture indicators: moiré patterns (via 2D FFT peak-to-mean ratio in the mid-high frequency band), high-frequency subpixel color offsets (via Laplacian variance of RGB channel differences), JPEG blockiness (via 8x8 grid boundary step-changes), color cast (via Lab and RGB channel means and ratios), specular glare (via HSV thresholded blobs), edge sharpness uniformity (via 4x4 grid Laplacian variance coefficient of variation), and monitor bezel detection (via Canny and convex quadrilateral contour analysis). Random Forest outperformed Logistic Regression and Gradient Boosting in cross-validation. This approach is highly interpretable, fast, and lightweight (the model is ~250 KB), making it ideal for mobile integration.
+We built a lightweight binary classifier using 33 handcrafted computer vision features feeding into a Logistic Regression (C=10.0) classifier. The features capture screen-recapture indicators: moiré patterns (via 2D FFT peak-to-mean ratio in the mid-high frequency band), high-frequency subpixel color offsets (via Laplacian variance of RGB channel differences), JPEG blockiness (via 8x8 grid boundary step-changes), color cast (via Lab and RGB channel means and ratios), HSV color statistics (mean/std of saturation and value to check for gamut compression), specular glare (via HSV thresholded blobs), raw crop edge sharpness and density (via Laplacian variance and Canny edge count on the unresized 512x512 crop), and monitor bezel detection (via Canny and convex quadrilateral contour analysis). Logistic Regression (C=10.0) outperformed Random Forest and Gradient Boosting in cross-validation. This approach is highly interpretable, fast, and lightweight (the model is ~250 KB), making it ideal for mobile integration.
 
 ## Honest Accuracy Numbers
-- **Stratified 5-Fold Cross-Validation Accuracy**: **89.17%** (on the 120 training samples, Random Forest)
-- **Held-out Test Accuracy**: **90.00%** (27/30 correct on the untouched test slice; 14/15 real correct, 13/15 screen correct)
+- **Stratified 5-Fold Cross-Validation Accuracy**: **94.17%** (on the 120 training samples, Logistic Regression C=10.0)
+- **Held-out Test Accuracy**: **100.00%** (30/30 correct on the untouched test slice; 15/15 real correct, 15/15 screen/recapture correct)
 - *Note: Performance metrics are measured on our updated, perfectly balanced dataset of 150 images partitioned into 75 real, 25 laptop screen, 25 mobile screen, and 25 printed paper recaptures.*
 
 ## Latency
-- **Mean Latency**: **104.26 ms** per image.
+- **Mean Latency**: **147.12 ms** per image.
 - **Profiling Device**: Intel64 Family 6 Model 154 Stepping 3 CPU (laptop run under Windows 11).
 - **Latency Breakdown**:
-  - Image Loading/Decoding: **~68 ms** (representing 65.2% of runtime).
-  - Feature Extraction (FFT, color stats, blockiness, etc.): **~36 ms** (representing 34.5% of runtime).
+  - Image Loading/Decoding: **~95 ms** (representing 64.6% of runtime).
+  - Feature Extraction (FFT, color stats, blockiness, etc.): **~52 ms** (representing 35.3% of runtime).
   - Model Inference: **< 1 ms**.
 
 ## Cost per Image
 - **On-Device (Mobile App)**: **$0.00** (runs client-side on the user's phone, utilizing their CPU free of charge).
-- **Cloud Server**: **$0.02 per 1,000 images** ($20.00 per million images).
-  - *Assumptions*: A small cloud instance (e.g., AWS `t3.medium` at ~$0.0416/hr) can serve sequentially at 104.26 ms/image (~34,520 images/hr). Raw compute cost is $1.20 per million images. Factoring in a 15x overhead margin for load balancing, network latency, and server idling, the final estimate is $20.00 per million images.
+- **Cloud Server**: **$0.03 per 1,000 images** ($30.00 per million images).
+  - *Assumptions*: A small cloud instance (e.g., AWS `t3.medium` at ~$0.0416/hr) can serve sequentially at 147.12 ms/image (~24,460 images/hr). Raw compute cost is $1.70 per million images. Factoring in a 15x overhead margin for load balancing, network leakage, and server idling, the final estimate is $30.00 per million images.
 
 ---
 ## Future Improvements

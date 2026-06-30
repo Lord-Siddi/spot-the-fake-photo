@@ -120,6 +120,21 @@ def extract_color_cast_features(rgb_resized):
         std_a, std_b_lab
     ]
 
+def extract_hsv_color_features(rgb_resized):
+    """
+    Extracts HSV saturation and value statistics to check for gamut compression (common in paper prints).
+    """
+    hsv = cv2.cvtColor(rgb_resized, cv2.COLOR_RGB2HSV)
+    s = hsv[:, :, 1].astype(float)
+    v = hsv[:, :, 2].astype(float)
+    
+    mean_s = np.mean(s)
+    std_s = np.std(s)
+    mean_v = np.mean(v)
+    std_v = np.std(v)
+    
+    return [mean_s, std_s, mean_v, std_v]
+
 def extract_glare_features(rgb_resized):
     """
     Isolates and counts potential glare regions (high brightness, low saturation blobs).
@@ -142,21 +157,21 @@ def extract_glare_features(rgb_resized):
         
     return [glare_ratio, float(num_blobs), avg_blob_size]
 
-def extract_sharpness_features(gray_resized):
+def extract_sharpness_features(gray_crop):
     """
-    Measures global sharpness (Laplacian variance) and focus uniformity across grid cells.
-    Uniform sharpness across the frame is a common indicator of a flat recaptured screen.
+    Measures global sharpness (Laplacian variance) and focus uniformity across grid cells
+    on the raw 512x512 crop to avoid any resizing/interpolation low-pass blur.
+    Also computes Canny edge density to measure high-frequency detail content.
     """
-    lap = cv2.Laplacian(gray_resized, cv2.CV_64F)
+    lap = cv2.Laplacian(gray_crop, cv2.CV_64F)
     global_var = np.var(lap)
     
-    # 4x4 grid sharpness distribution
-    h, w = gray_resized.shape
-    sh, sw = h // 4, w // 4
+    # 4x4 grid sharpness distribution (each cell is 128x128)
+    sh, sw = 128, 128
     variances = []
     for i in range(4):
         for j in range(4):
-            patch = gray_resized[i*sh:(i+1)*sh, j*sw:(j+1)*sw]
+            patch = gray_crop[i*sh:(i+1)*sh, j*sw:(j+1)*sw]
             patch_lap = cv2.Laplacian(patch, cv2.CV_64F)
             variances.append(np.var(patch_lap))
             
@@ -165,7 +180,11 @@ def extract_sharpness_features(gray_resized):
     std_var = np.std(variances)
     coef_var = std_var / (mean_var + 1e-6)
     
-    return [global_var, coef_var]
+    # Canny edge density
+    edges = cv2.Canny(gray_crop, 30, 150)
+    edge_density = np.sum(edges > 0) / float(edges.size)
+    
+    return [global_var, coef_var, edge_density]
 
 def extract_blockiness_features(gray_crop):
     """
@@ -223,7 +242,7 @@ def extract_bezel_features(gray_resized):
 
 def extract_features(image_path):
     """
-    Extracts a 28-dimensional flat feature vector from an image.
+    Extracts a 33-dimensional flat feature vector from an image.
     Uses full resolution loading with 512x512 crops to preserve subpixel details for peak accuracy.
     """
     img_bgr = cv2.imread(image_path)
@@ -261,8 +280,9 @@ def extract_features(image_path):
     features.extend(extract_subpixel_features(rgb_crop))
     features.extend(extract_banding_features(gray_crop))
     features.extend(extract_color_cast_features(img_rgb_resized))
+    features.extend(extract_hsv_color_features(img_rgb_resized))   # 4 features
     features.extend(extract_glare_features(img_rgb_resized))
-    features.extend(extract_sharpness_features(img_gray_resized))
+    features.extend(extract_sharpness_features(gray_crop))          # 3 features (calculated on raw crop)
     features.extend(extract_blockiness_features(gray_crop))
     features.extend(extract_bezel_features(img_gray_resized))
     
@@ -277,8 +297,9 @@ FEATURE_NAMES = [
     "color_std_r", "color_std_g", "color_std_b",
     "color_ratio_rg", "color_ratio_bg", "color_ratio_rb",
     "color_mean_a", "color_mean_b_lab", "color_std_a", "color_std_b_lab",
+    "hsv_mean_s", "hsv_std_s", "hsv_mean_v", "hsv_std_v",
     "glare_ratio", "glare_num_blobs", "glare_avg_blob_size",
-    "sharpness_global_var", "sharpness_coef_var",
+    "sharpness_global_var", "sharpness_coef_var", "sharpness_edge_density",
     "block_h", "block_v",
     "bezel_found", "bezel_quad_fraction"
 ]

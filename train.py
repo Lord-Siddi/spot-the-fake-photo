@@ -6,6 +6,7 @@ from sklearn.model_selection import StratifiedKFold, train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.svm import SVC
 from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
 
 # Import feature extraction functions
@@ -91,11 +92,13 @@ def main():
     # Step 3: Stratified 5-Fold Cross-Validation on the training set
     skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
     
-    # Use class_weight='balanced' to handle the 1:2 ratio of real vs screen images
+    # Grid search classifiers to find the best generalized fit
     classifiers = {
-        "Logistic Regression (L2)": LogisticRegression(max_iter=1000, class_weight='balanced', random_state=42),
-        "Random Forest": RandomForestClassifier(n_estimators=100, max_depth=5, class_weight='balanced', random_state=42),
-        "Gradient Boosting": GradientBoostingClassifier(n_estimators=100, max_depth=3, learning_rate=0.1, random_state=42)
+        "Logistic Regression (L2)": LogisticRegression(C=1.0, max_iter=1000, class_weight='balanced', random_state=42),
+        "Logistic Regression (C=10.0)": LogisticRegression(C=10.0, max_iter=1000, class_weight='balanced', random_state=42),
+        "Random Forest (depth=10)": RandomForestClassifier(n_estimators=200, max_depth=10, class_weight='balanced', random_state=42),
+        "SVM (Linear)": SVC(kernel='linear', C=1.0, probability=True, class_weight='balanced', random_state=42),
+        "SVM (RBF)": SVC(kernel='rbf', C=10.0, probability=True, class_weight='balanced', random_state=42)
     }
     
     best_cv_mean = 0.0
