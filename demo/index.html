@@ -354,6 +354,107 @@
             0%, 100% { opacity: 0.4; }
             50% { opacity: 1; }
         }
+
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(11, 15, 25, 0.85);
+            backdrop-filter: blur(8px);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            transition: opacity 0.3s ease;
+        }
+
+        .modal-content {
+            background: rgba(20, 27, 45, 0.9);
+            border: 1px solid var(--border-color);
+            backdrop-filter: blur(12px);
+            padding: 1.5rem;
+            border-radius: 16px;
+            width: 90%;
+            max-width: 500px;
+            display: flex;
+            flex-direction: column;
+            gap: 1.2rem;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+            animation: modalFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes modalFadeIn {
+            from { transform: scale(0.95); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0.8rem;
+        }
+
+        .modal-header h3 {
+            font-size: 1.15rem;
+            font-weight: 600;
+            background: linear-gradient(90deg, #fff 0%, var(--text-secondary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 1.8rem;
+            cursor: pointer;
+            line-height: 1;
+            padding: 0;
+            transition: color 0.2s;
+        }
+
+        .close-btn:hover {
+            color: var(--accent-red);
+        }
+
+        .camera-stream-wrapper {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 4/3;
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.8);
+        }
+
+        #video-stream {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .modal-actions {
+            display: flex;
+            justify-content: center;
+            padding-top: 0.5rem;
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.03);
+            color: #fff;
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.2);
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.05);
+        }
     </style>
 </head>
 <body>
@@ -384,9 +485,18 @@
                 <img id="preview-img" alt="Uploaded preview">
             </div>
             
-            <button class="btn btn-primary" id="btn-select">
-                Select Photo File
-            </button>
+            <div style="display: flex; gap: 1rem; margin-top: 1rem; width: 100%;">
+                <button class="btn btn-primary" id="btn-select" style="flex: 1;">
+                    Select File
+                </button>
+                <button class="btn btn-secondary" id="btn-camera" style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width: 18px; height: 18px;">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    </svg>
+                    Use Camera
+                </button>
+            </div>
         </div>
 
         <!-- Result Dashboard Card -->
@@ -566,6 +676,93 @@
                 scoreBar.style.background = "linear-gradient(90deg, var(--accent-green) 0%, var(--accent-cyan) 100%)";
             }
         }
+
+        // Camera capture logic
+        const cameraModal = document.getElementById('camera-modal');
+        const btnCamera = document.getElementById('btn-camera');
+        const btnCloseCamera = document.getElementById('btn-close-camera');
+        const videoStream = document.getElementById('video-stream');
+        const btnCapture = document.getElementById('btn-capture');
+        let activeStream = null;
+
+        btnCamera.addEventListener('click', async () => {
+            try {
+                // Try back camera by default for environmental shots
+                activeStream = await navigator.mediaDevices.getUserMedia({
+                    video: { 
+                        facingMode: { ideal: 'environment' }, 
+                        width: { ideal: 1280 }, 
+                        height: { ideal: 960 } 
+                    }
+                });
+                videoStream.srcObject = activeStream;
+                cameraModal.style.display = 'flex';
+            } catch (err) {
+                console.error("Camera access error, fallback to any camera:", err);
+                try {
+                    activeStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                    videoStream.srcObject = activeStream;
+                    cameraModal.style.display = 'flex';
+                } catch (fallbackErr) {
+                    console.error("All camera access failed:", fallbackErr);
+                    alert("Could not access camera. Please make sure camera permissions are allowed.");
+                }
+            }
+        });
+
+        function stopCamera() {
+            if (activeStream) {
+                activeStream.getTracks().forEach(track => track.stop());
+                activeStream = null;
+            }
+            cameraModal.style.display = 'none';
+        }
+
+        btnCloseCamera.addEventListener('click', stopCamera);
+        cameraModal.addEventListener('click', (e) => {
+            if (e.target === cameraModal) stopCamera();
+        });
+
+        btnCapture.addEventListener('click', () => {
+            if (!activeStream) return;
+            
+            const canvas = document.createElement('canvas');
+            // Try to use video natural resolution, fallback to video layout dimensions
+            canvas.width = videoStream.videoWidth || 640;
+            canvas.height = videoStream.videoHeight || 480;
+            const ctx = canvas.getContext('2d');
+            
+            // Draw frame to canvas
+            ctx.drawImage(videoStream, 0, 0, canvas.width, canvas.height);
+            
+            canvas.toBlob((blob) => {
+                // Preview captured frame
+                const url = URL.createObjectURL(blob);
+                previewImg.src = url;
+                placeholder.style.display = 'none';
+                previewImg.style.display = 'block';
+                
+                // Classify captured frame
+                runClassification(blob);
+                stopCamera();
+            }, 'image/jpeg', 0.95);
+        });
     </script>
+
+    <!-- Camera Viewfinder Modal -->
+    <div class="modal-overlay" id="camera-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Camera Viewfinder</h3>
+                <button class="close-btn" id="btn-close-camera">&times;</button>
+            </div>
+            <div class="camera-stream-wrapper">
+                <video id="video-stream" autoplay playsinline></video>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-primary" id="btn-capture" style="width: 100%;">Capture Photo</button>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
