@@ -9,30 +9,24 @@ def extract_fft_features(gray_crop):
     fshift = np.fft.fftshift(f)
     magnitude = np.abs(fshift)
     
-    # Clip to avoid zero division/log errors
     magnitude = np.clip(magnitude, 1e-6, None)
     
     h, w = magnitude.shape
     cy, cx = h // 2, w // 2
     
-    # Coordinate grid for distances from the center
     y, x = np.ogrid[-cy:h-cy, -cx:w-cx]
     r = np.sqrt(x*x + y*y)
     
     max_r = min(cy, cx)
     
-    # Define masks for frequency bands
     low_mask = r < 0.1 * max_r
-    mid_mask = (r >= 0.1 * max_r) & (r < 0.5 * max_r)
     high_mask = (r >= 0.5 * max_r) & (r < 0.9 * max_r)
     mid_high_mask = (r >= 0.1 * max_r) & (r < 0.9 * max_r)
     
-    # High frequency to low frequency energy ratio
     low_energy = np.sum(magnitude[low_mask])
     high_energy = np.sum(magnitude[high_mask])
     ratio_hf = high_energy / (low_energy + 1e-6)
     
-    # Peak energy ratio in the mid-to-high frequency bands (typical of screen grid moiré)
     mid_high_vals = magnitude[mid_high_mask]
     if len(mid_high_vals) > 0:
         peak_val = np.max(mid_high_vals)
@@ -47,8 +41,6 @@ def extract_subpixel_features(rgb_crop):
     """
     Detects high-frequency variations in R-G and G-B differences caused by
     physical subpixel layouts on screens.
-    Also extracts layout-independent normalized variances and Pearson correlation coefficients 
-    to support diverse screen matrices (like PenTile OLED layouts).
     """
     r = rgb_crop[:, :, 0].astype(float)
     g = rgb_crop[:, :, 1].astype(float)
@@ -57,45 +49,13 @@ def extract_subpixel_features(rgb_crop):
     diff_rg = r - g
     diff_gb = g - b
     
-    lap_r = cv2.Laplacian(r, cv2.CV_64F)
-    lap_g = cv2.Laplacian(g, cv2.CV_64F)
-    lap_b = cv2.Laplacian(b, cv2.CV_64F)
-    
     lap_rg = cv2.Laplacian(diff_rg, cv2.CV_64F)
     lap_gb = cv2.Laplacian(diff_gb, cv2.CV_64F)
-    
-    var_r = np.var(lap_r)
-    var_g = np.var(lap_g)
-    var_b = np.var(lap_b)
     
     var_rg = np.var(lap_rg)
     var_gb = np.var(lap_gb)
     
-    # Normalized scale-invariant features
-    norm_var_rg = var_rg / (var_r + var_g + 1e-6)
-    norm_var_gb = var_gb / (var_g + var_b + 1e-6)
-    
-    # Pearson correlation coefficients
-    std_r = np.std(lap_r)
-    std_g = np.std(lap_g)
-    std_b = np.std(lap_b)
-    
-    if std_r > 1e-5 and std_g > 1e-5:
-        corr_rg = np.mean((lap_r - np.mean(lap_r)) * (lap_g - np.mean(lap_g))) / (std_r * std_g)
-    else:
-        corr_rg = 1.0
-        
-    if std_g > 1e-5 and std_b > 1e-5:
-        corr_gb = np.mean((lap_g - np.mean(lap_g)) * (lap_b - np.mean(lap_b))) / (std_g * std_b)
-    else:
-        corr_gb = 1.0
-        
-    if std_r > 1e-5 and std_b > 1e-5:
-        corr_rb = np.mean((lap_r - np.mean(lap_r)) * (lap_b - np.mean(lap_b))) / (std_r * std_b)
-    else:
-        corr_rb = 1.0
-        
-    return [var_rg, var_gb, norm_var_rg, norm_var_gb, corr_rg, corr_gb, corr_rb]
+    return [var_rg, var_gb]
 
 def extract_banding_features(gray_crop):
     """
@@ -106,11 +66,9 @@ def extract_banding_features(gray_crop):
     grad_mag = np.sqrt(gx**2 + gy**2)
     
     total_pixels = grad_mag.size
-    # Ratio of flat or low-gradient pixels
     flat_pixels = np.sum(grad_mag < 1.0)
     flat_ratio = flat_pixels / float(total_pixels)
     
-    # Standard deviation of gradient magnitude
     grad_std = np.std(grad_mag)
     
     return [flat_ratio, grad_std]
@@ -135,7 +93,6 @@ def extract_color_cast_features(rgb_resized):
     ratio_bg = mean_b / (mean_g + 1e-6)
     ratio_rb = mean_r / (mean_b + 1e-6)
     
-    # Convert to Lab
     lab = cv2.cvtColor(rgb_resized, cv2.COLOR_RGB2LAB)
     l_chan = lab[:, :, 0].astype(float)
     a_chan = lab[:, :, 1].astype(float)
@@ -154,21 +111,6 @@ def extract_color_cast_features(rgb_resized):
         std_a, std_b_lab
     ]
 
-def extract_hsv_color_features(rgb_resized):
-    """
-    Extracts HSV saturation and value statistics to check for gamut compression (common in paper prints).
-    """
-    hsv = cv2.cvtColor(rgb_resized, cv2.COLOR_RGB2HSV)
-    s = hsv[:, :, 1].astype(float)
-    v = hsv[:, :, 2].astype(float)
-    
-    mean_s = np.mean(s)
-    std_s = np.std(s)
-    mean_v = np.mean(v)
-    std_v = np.std(v)
-    
-    return [mean_s, std_s, mean_v, std_v]
-
 def extract_glare_features(rgb_resized):
     """
     Isolates and counts potential glare regions (high brightness, low saturation blobs).
@@ -177,7 +119,6 @@ def extract_glare_features(rgb_resized):
     s = hsv[:, :, 1]
     v = hsv[:, :, 2]
     
-    # Glare condition: V is high (bright highlight), S is low (desaturated color)
     glare_mask = (v > 220) & (s < 50)
     glare_ratio = np.sum(glare_mask) / float(v.size)
     
@@ -191,21 +132,18 @@ def extract_glare_features(rgb_resized):
         
     return [glare_ratio, float(num_blobs), avg_blob_size]
 
-def extract_sharpness_features(gray_crop):
+def extract_sharpness_features(gray_resized):
     """
-    Measures global sharpness (Laplacian variance) and focus uniformity across grid cells
-    on the raw 512x512 crop to avoid any resizing/interpolation low-pass blur.
-    Also computes Canny edge density to measure high-frequency detail content.
+    Measures global sharpness (Laplacian variance) and focus uniformity across grid cells.
     """
-    lap = cv2.Laplacian(gray_crop, cv2.CV_64F)
+    lap = cv2.Laplacian(gray_resized, cv2.CV_64F)
     global_var = np.var(lap)
     
-    # 4x4 grid sharpness distribution (each cell is 128x128)
-    sh, sw = 128, 128
+    sh, sw = gray_resized.shape[0] // 4, gray_resized.shape[1] // 4
     variances = []
     for i in range(4):
         for j in range(4):
-            patch = gray_crop[i*sh:(i+1)*sh, j*sw:(j+1)*sw]
+            patch = gray_resized[i*sh:(i+1)*sh, j*sw:(j+1)*sw]
             patch_lap = cv2.Laplacian(patch, cv2.CV_64F)
             variances.append(np.var(patch_lap))
             
@@ -214,18 +152,12 @@ def extract_sharpness_features(gray_crop):
     std_var = np.std(variances)
     coef_var = std_var / (mean_var + 1e-6)
     
-    # Canny edge density
-    edges = cv2.Canny(gray_crop, 30, 150)
-    edge_density = np.sum(edges > 0) / float(edges.size)
-    
-    return [global_var, coef_var, edge_density]
+    return [global_var, coef_var]
 
 def extract_blockiness_features(gray_crop):
     """
-    Detects 8x8 grid boundary pixel step-changes (JPEG/compression artifacts) versus
-    the internal differences within block grids.
+    Detects 8x8 grid boundary pixel step-changes (JPEG/compression artifacts).
     """
-    # Horizontal differences
     diff_h = np.abs(gray_crop[:, :-1].astype(float) - gray_crop[:, 1:])
     cols = np.arange(diff_h.shape[1])
     boundary_cols = (cols + 1) % 8 == 0
@@ -235,7 +167,6 @@ def extract_blockiness_features(gray_crop):
     mean_internal_h = np.mean(diff_h[:, internal_cols])
     block_h = mean_boundary_h / (mean_internal_h + 1e-6)
     
-    # Vertical differences
     diff_v = np.abs(gray_crop[:-1, :].astype(float) - gray_crop[1:, :])
     rows = np.arange(diff_v.shape[0])
     boundary_rows = (rows + 1) % 8 == 0
@@ -276,8 +207,8 @@ def extract_bezel_features(gray_resized):
 
 def extract_features(image_path):
     """
-    Extracts a 38-dimensional flat feature vector from an image.
-    Preserves raw high resolution for files to keep subpixels intact.
+    Extracts a 28-dimensional flat feature vector from an image.
+    Uses full resolution loading with 512x512 crops to preserve subpixel details.
     """
     img_bgr = cv2.imread(image_path)
     if img_bgr is None:
@@ -296,7 +227,6 @@ def extract_features(image_path):
     gray_crop = img_gray[y_start:y_end, x_start:x_end]
     rgb_crop = img_rgb[y_start:y_end, x_start:x_end]
     
-    # Pad crops if the image is smaller than 512x512
     if gray_crop.shape != (512, 512):
         pad_y = 512 - gray_crop.shape[0]
         pad_x = 512 - gray_crop.shape[1]
@@ -307,16 +237,14 @@ def extract_features(image_path):
     img_rgb_resized = cv2.resize(img_rgb, (512, 384))
     img_gray_resized = cv2.resize(img_gray, (512, 384))
     
-    # Extract feature components
     features = []
     
     features.extend(extract_fft_features(gray_crop))
-    features.extend(extract_subpixel_features(rgb_crop))            # 7 features
+    features.extend(extract_subpixel_features(rgb_crop))
     features.extend(extract_banding_features(gray_crop))
     features.extend(extract_color_cast_features(img_rgb_resized))
-    features.extend(extract_hsv_color_features(img_rgb_resized))   # 4 features
     features.extend(extract_glare_features(img_rgb_resized))
-    features.extend(extract_sharpness_features(gray_crop))          # 3 features
+    features.extend(extract_sharpness_features(img_gray_resized))
     features.extend(extract_blockiness_features(gray_crop))
     features.extend(extract_bezel_features(img_gray_resized))
     
@@ -326,16 +254,13 @@ def extract_features(image_path):
 FEATURE_NAMES = [
     "fft_high_low_ratio", "fft_moire_peak_to_mean",
     "subpixel_var_rg", "subpixel_var_gb",
-    "subpixel_norm_var_rg", "subpixel_norm_var_gb",
-    "subpixel_corr_rg", "subpixel_corr_gb", "subpixel_corr_rb",
     "banding_flat_ratio", "banding_grad_std",
     "color_mean_r", "color_mean_g", "color_mean_b",
     "color_std_r", "color_std_g", "color_std_b",
     "color_ratio_rg", "color_ratio_bg", "color_ratio_rb",
     "color_mean_a", "color_mean_b_lab", "color_std_a", "color_std_b_lab",
-    "hsv_mean_s", "hsv_std_s", "hsv_mean_v", "hsv_std_v",
     "glare_ratio", "glare_num_blobs", "glare_avg_blob_size",
-    "sharpness_global_var", "sharpness_coef_var", "sharpness_edge_density",
+    "sharpness_global_var", "sharpness_coef_var",
     "block_h", "block_v",
     "bezel_found", "bezel_quad_fraction"
 ]

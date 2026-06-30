@@ -2,7 +2,7 @@ import os
 import glob
 import numpy as np
 import joblib
-from sklearn.model_selection import StratifiedKFold, train_test_split
+from sklearn.model_selection import StratifiedKFold, train_test_split, GridSearchCV
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
@@ -89,44 +89,62 @@ def main():
     X_train_scaled = scaler.fit_transform(X_train)
     X_test_scaled = scaler.transform(X_test)
     
-    # Step 3: Stratified 5-Fold Cross-Validation on the training set
+    # Step 3: Stratified 5-Fold Cross-Validation & Grid Search
     skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
     
-    # Grid search classifiers to find the best generalized fit (excluding non-linear RBF to prevent overfitting)
-    classifiers = {
-        "Logistic Regression (L2)": LogisticRegression(C=1.0, max_iter=1000, class_weight='balanced', random_state=42),
-        "Logistic Regression (C=10.0)": LogisticRegression(C=10.0, max_iter=1000, class_weight='balanced', random_state=42),
-        "Random Forest (depth=10)": RandomForestClassifier(n_estimators=200, max_depth=10, class_weight='balanced', random_state=42),
-        "SVM (Linear)": SVC(kernel='linear', C=1.0, probability=True, class_weight='balanced', random_state=42)
+    # Define models and their parameter grids for systematic search
+    models_to_search = {
+        "Logistic Regression": (
+            LogisticRegression(max_iter=1000, class_weight='balanced', random_state=42, solver='liblinear'),
+            {
+                'C': [0.01, 0.1, 1.0, 10.0, 100.0],
+                'penalty': ['l1', 'l2']
+            }
+        ),
+        "Random Forest": (
+            RandomForestClassifier(class_weight='balanced', random_state=42),
+            {
+                'n_estimators': [50, 100, 200],
+                'max_depth': [3, 5, 10, None]
+            }
+        ),
+        "Gradient Boosting": (
+            GradientBoostingClassifier(random_state=42),
+            {
+                'learning_rate': [0.05, 0.1, 0.2],
+                'max_depth': [3, 4, 5],
+                'n_estimators': [50, 100]
+            }
+        )
     }
     
     best_cv_mean = 0.0
+    best_clf = None
     best_clf_name = None
     
-    print("\n--- Running 5-Fold Cross-Validation ---")
-    for name, clf in classifiers.items():
-        cv_scores = []
-        for train_idx, val_idx in skf.split(X_train_scaled, y_train):
-            X_tr, X_va = X_train_scaled[train_idx], X_train_scaled[val_idx]
-            y_tr, y_va = y_train[train_idx], y_train[val_idx]
-            
-            clf.fit(X_tr, y_tr)
-            preds = clf.predict(X_va)
-            cv_scores.append(accuracy_score(y_va, preds))
-            
-        mean_cv = np.mean(cv_scores)
-        std_cv = np.std(cv_scores)
-        print(f"{name:25s} | CV Accuracy: {mean_cv:.4f} (+/- {std_cv:.4f})")
+    print("\n--- Running Systematic Hyperparameter Grid Search ---")
+    for name, (model, param_grid) in models_to_search.items():
+        print(f"Grid searching {name}...")
+        grid_search = GridSearchCV(
+            estimator=model,
+            param_grid=param_grid,
+            cv=skf,
+            scoring='accuracy',
+            n_jobs=-1
+        )
+        grid_search.fit(X_train_scaled, y_train)
+        
+        mean_cv = grid_search.best_score_
+        best_params = grid_search.best_params_
+        print(f"  Best params: {best_params}")
+        print(f"  Best CV Accuracy: {mean_cv:.4f}")
         
         if mean_cv > best_cv_mean:
             best_cv_mean = mean_cv
-            best_clf_name = name
+            best_clf = grid_search.best_estimator_
+            best_clf_name = f"{name} ({best_params})"
             
     print(f"\nBest classifier based on CV: {best_clf_name} (Accuracy: {best_cv_mean:.4f})")
-    
-    # Train the chosen best model on the entire training set
-    best_clf = classifiers[best_clf_name]
-    best_clf.fit(X_train_scaled, y_train)
     
     # Evaluate on the untouched 20% held-out test set
     test_preds = best_clf.predict(X_test_scaled)
