@@ -3,7 +3,7 @@ import glob
 import numpy as np
 import joblib
 from sklearn.model_selection import StratifiedKFold, train_test_split, GridSearchCV
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import RobustScaler
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.svm import SVC
@@ -84,8 +84,8 @@ def main():
     print(f"Training split: {X_train.shape[0]} samples")
     print(f"Held-out test split: {X_test.shape[0]} samples")
     
-    # Step 2: Scale features
-    scaler = StandardScaler()
+    # Step 2: Scale features using RobustScaler (resilient to outliers in CV metrics)
+    scaler = RobustScaler()
     X_train_scaled = scaler.fit_transform(X_train)
     X_test_scaled = scaler.transform(X_test)
     
